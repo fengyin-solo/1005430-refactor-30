@@ -44,7 +44,14 @@
       <tbody>
         <tr v-for="row in rows" :key="String(row.id)">
           <td v-for="column in columns" :key="column">{{ row[column] ?? '—' }}</td>
-          <td>{{ row.status }}</td>
+          <td>
+            {{ row.status }}
+            <span
+              v-if="row[PENDING_CHECK_FIELD]"
+              class="tag-pending"
+              :title="`标识编号：${signCode(row)}，交接待核`"
+            >待核</span>
+          </td>
           <td class="row-actions">
             <button
               v-for="action in actions"
@@ -79,6 +86,7 @@ import {
   moduleMeta,
   runAction as applyAction,
 } from '@/api/local-service'
+import { PENDING_CHECK_FIELD, signCode } from '@/data/signboard'
 import type { EntryRow } from '@/data/types'
 
 const meta = moduleMeta('report')

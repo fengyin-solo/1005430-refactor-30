@@ -35,3 +35,4 @@ body { margin: 0; background: #f6f8fb; color: #1f2937; }
 .error-text { color: #b42318; }
 .status-legend { display: flex; flex-wrap: wrap; gap: 12px; margin: 0 0 10px; font-size: 12px; color: var(--muted); }
 .legend-item { background: #eef2f7; border-radius: 999px; padding: 2px 10px; }
+.tag-pending { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; background: #fff7e6; border: 1px solid #f5c66b; color: #b5560a; font-size: 12px; cursor: help; }

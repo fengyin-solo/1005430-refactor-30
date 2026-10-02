@@ -47,7 +47,7 @@
           <td>{{ row.status }}</td>
           <td class="row-actions">
             <button
-              v-for="action in actions"
+              v-for="action in actionsFor(row)"
               :key="action"
               class="link"
               type="button"
@@ -55,6 +55,7 @@
             >
               {{ action }}
             </button>
+            <span v-if="!actionsFor(row).length">—</span>
           </td>
         </tr>
         <tr v-if="!rows.length">
@@ -79,6 +80,7 @@ import {
   moduleMeta,
   runAction as applyAction,
 } from '@/api/local-service'
+import { SIGN_STATUSES } from '@/data/signboard'
 import type { EntryRow } from '@/data/types'
 
 const meta = moduleMeta('signboard')
@@ -98,6 +100,17 @@ const statusSummary = computed(() =>
     count: rows.value.filter((row) => String(row.status) === status).length,
   })),
 )
+
+// 状态一段一段往前推：页面只暴露当前状态的下一段动作，倒序动作不给出入口。
+const actionByTarget = new Map(actions.map((action) => [meta.actionTargets[action], action]))
+function actionsFor(row: EntryRow): string[] {
+  const index = (SIGN_STATUSES as readonly string[]).indexOf(String(row.status))
+  if (index < 0 || index >= SIGN_STATUSES.length - 1) {
+    return []
+  }
+  const action = actionByTarget.get(SIGN_STATUSES[index + 1])
+  return action ? [action] : []
+}
 
 function resetFilters() {
   filters.value = {}
