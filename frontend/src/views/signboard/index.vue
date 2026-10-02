@@ -65,6 +65,7 @@
 
     <footer class="page-foot">
       <span>共 {{ total }} 条警示标识记录</span>
+      <span v-if="noticeMessage" class="notice-text">{{ noticeMessage }}</span>
       <span v-if="errorMessage" class="error-text">{{ errorMessage }}</span>
     </footer>
   </section>
@@ -75,6 +76,7 @@ import { computed, onMounted, ref } from 'vue'
 
 import {
   downloadEntries,
+  handoverSign,
   listEntries,
   moduleMeta,
   runAction as applyAction,
@@ -83,13 +85,14 @@ import type { EntryRow } from '@/data/types'
 
 const meta = moduleMeta('signboard')
 const columns = ["标识编号", "所属隐患点", "标识类别", "设置位置", "设置日期", "责任人", "更换日期", "标识状态"]
-const actions = ["确认设置", "提交更换", "登记撤除"]
+const actions = ["确认设置", "提交更换", "登记撤除", "办理交接"]
 const statuses = ["待设置", "已设置", "待更换", "已撤除"]
 const stats = [{"label": "待设置标识", "value": 0}, {"label": "待更换标识", "value": 0}, {"label": "已设置标识", "value": 0}]
 
 const rows = ref<EntryRow[]>([])
 const total = ref(0)
 const errorMessage = ref('')
+const noticeMessage = ref('')
 const filters = ref<Record<string, string>>({})
 const filterFields = columns.slice(0, 3)
 const statusSummary = computed(() =>
@@ -114,16 +117,23 @@ function openCreate() {
 
 function runAction(action: string, row: EntryRow) {
   errorMessage.value = ''
-  const result = applyAction(meta.key, Number(row.id), action)
+  noticeMessage.value = ''
+  const result =
+    action === '办理交接'
+      ? handoverSign(Number(row.id))
+      : applyAction(meta.key, Number(row.id), action)
   if (!result.ok) {
     errorMessage.value = result.message
     return
   }
   reload()
+  // reload 会先清提示，成功消息在刷新之后再挂出来。
+  noticeMessage.value = result.message
 }
 
 function reload() {
   errorMessage.value = ''
+  noticeMessage.value = ''
   try {
     const payload = listEntries(meta.key, filters.value)
     rows.value = payload.items

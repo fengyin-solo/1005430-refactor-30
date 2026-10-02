@@ -1,5 +1,16 @@
 import { MODULE_BY_KEY } from '@/data/modules'
 import { allRows, listRows, resetRows, saveRows } from '@/data/local-store'
+import {
+  buildHandoverLedgerEntry,
+  checkSignForward,
+  findHandoverEntry,
+  inspectSignEntry,
+  nextLedgerId,
+  readSignCode,
+  REPORT_KEY,
+  SIGN_ENTITY,
+  SIGNBOARD_KEY,
+} from '@/data/signboard'
 import type { ActionResult, EntryRow, ModuleMeta, OverviewResult, PageResult } from '@/data/types'
 
 // 会写进数据的「往回走」动作：命中就把这条记录标成异常态，看板上能一眼看出来。
@@ -43,6 +54,21 @@ export function runAction(key: string, id: number, action: string): ActionResult
   if (current === target) {
     return { ok: false, message: `${meta.entity}已经是「${target}」，不用重复操作` }
   }
+
+  // 警示标识：先按状态机闸住倒序/跨段，再走唯一的登记判定。
+  // 两个入口（确认设置、登记撤除）以及提交更换共用同一份 inspectSignEntry，
+  // 同一条数据无论从哪个入口办理，结论都一致。
+  if (key === SIGNBOARD_KEY) {
+    const transition = checkSignForward(current, target)
+    if (!transition.ok) {
+      return { ok: false, message: transition.message }
+    }
+    const inspection = inspectSignEntry(rows[index], rows)
+    if (!inspection.ok) {
+      return { ok: false, message: inspection.message }
+    }
+  }
+
   const lastStatus = meta.statuses[meta.statuses.length - 1]
   const updated: EntryRow = {
     ...rows[index],
@@ -54,6 +80,52 @@ export function runAction(key: string, id: number, action: string): ActionResult
   next[index] = updated
   saveRows(key, next)
   return { ok: true, message: `${meta.entity}已${action}，当前状态「${target}」` }
+}
+
+/**
+ * 警示标识交接：交接结果落到险情上报台账，添记一条「待核项」。
+ * 标识编号全程取自 readSignCode 这一处；同一条编号走两次交接只挂一条（幂等）。
+ */
+export function handoverSign(id: number): ActionResult {
+  const rows = listRows(SIGNBOARD_KEY)
+  const index = rows.findIndex((row) => Number(row.id) === id)
+  if (index < 0) {
+    return { ok: false, message: `没有找到编号为 ${id} 的${SIGN_ENTITY}` }
+  }
+  const signRow = rows[index]
+  const signCode = readSignCode(signRow)
+  if (signCode === '') {
+    return { ok: false, message: '该警示标识缺少标识编号，无法办理交接' }
+  }
+
+  const ledger = listRows(REPORT_KEY)
+  const existing = findHandoverEntry(ledger, signCode)
+  if (existing) {
+    // 同一标识编号第二次交接：台账不重复挂账，直接回原结论。
+    return {
+      ok: true,
+      message: `标识编号 ${signCode} 已在险情上报台账挂过交接待核项（${String(existing['上报编号'])}），不再重复登记`,
+    }
+  }
+
+  const entry = buildHandoverLedgerEntry({
+    id: nextLedgerId(ledger),
+    signCode,
+    hazard: String(signRow['所属隐患点'] ?? ''),
+    date: todayText(),
+  })
+  saveRows(REPORT_KEY, [...ledger, entry])
+  return {
+    ok: true,
+    message: `标识编号 ${signCode} 交接完成，险情上报台账已添记待核项（${String(entry['上报编号'])}）`,
+  }
+}
+
+function todayText(): string {
+  const now = new Date()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  return `${now.getFullYear()}-${month}-${day}`
 }
 
 export function resetModule(key: string): PageResult {

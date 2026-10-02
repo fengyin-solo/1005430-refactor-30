@@ -27,6 +27,7 @@ classes/
 *.class
 *.jar
 *.war
+.verify-build/
 *.local
 
 # ===== 包管理器 / 构建缓存 =====
